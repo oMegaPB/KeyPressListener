@@ -39,7 +39,7 @@ class KeyPressEventListener:
     def GetKeyboardLayoutID(self) -> int:
         return int(hex(win32api.GetKeyboardLayout(win32process.GetWindowThreadProcessId(win32gui.GetForegroundWindow())[0]) & (2**16 - 1)), 16)
     
-    async def ToUnicodeEx(self, keycode: int) -> str:
+    def ToUnicodeEx(self, keycode: int) -> str:
         if keycode == 17: return 'Ctrl'
         if keycode in [222, 192] and not win32api.GetAsyncKeyState(17) in [-32768, -32767]: # Ctrl
             shift = win32api.GetAsyncKeyState(0x10) in [-32768, -32767]
@@ -64,17 +64,17 @@ class KeyPressEventListener:
             return key.decode('cp1251')
         return self.none.get(keycode, None) if not win32api.GetAsyncKeyState(17) in [-32768, -32767] else None
     
-    async def _dispatch(self, keycode: int) -> Optional[bool]:
+    def _dispatch(self, keycode: int) -> Optional[bool]:
         caps = win32api.GetKeyState(0x14) == 1
         shift = win32api.GetAsyncKeyState(0x10) in [-32768, -32767]
-        sequence = await self.ToUnicodeEx(keycode)
+        sequence = self.ToUnicodeEx(keycode)
         if sequence:
             if self.need_to_await:
-                return await self.on_press(KeyEventArgs(sequence, keycode, shift, caps)) in [None, True]
+                return asyncio.run_coroutine_threadsafe(self.on_press(KeyEventArgs(sequence, keycode, shift, caps))) in [None, True]
             return self.on_press(KeyEventArgs(sequence, keycode, shift, caps)) in [None, True]
         return True
 
-    async def join(self) -> None: # return False in "on_press" to stop
+    def join(self) -> None: # return False in "on_press" to stop
         while True:
             win32api.Sleep(15)
             for i in range(255):
@@ -82,12 +82,12 @@ class KeyPressEventListener:
                 if state == -127 or state == -128:
                     if self.previous.get(i) is None:
                         self.previous[i] = state
-                        if not await self._dispatch(i):
+                        if not self._dispatch(i):
                             return
                     else:
                         if self.previous[i] != state:
                             self.previous[i] = state
-                            if not await self._dispatch(i):
+                            if not self._dispatch(i):
                                 return
 # ------------------------------------------------------------------------------------------------------
 # async def on_press(e: KeyEventArgs): # example on_press function
@@ -98,7 +98,5 @@ class KeyPressEventListener:
 #     else:
 #         print(e)
 # ------------------------------------------------------------------------------------------------------
-async def main():
-    with KeyPressEventListener(on_press=lambda e: print(e)) as listener:
-        await listener.join()
-asyncio.new_event_loop().run_until_complete(main())
+with KeyPressEventListener(on_press=lambda e: print(e)) as listener:
+    listener.join()
