@@ -66,7 +66,7 @@ class KeyPressEventListener:
         shift = win32api.GetAsyncKeyState(0x10) in [-32768, -32767]
         sequence = self.ToUnicodeEx(keycode)
         if sequence:
-            if asyncio.iscoroutinefunction(on_press):
+            if asyncio.iscoroutinefunction(self.on_press):
                 return asyncio.run_coroutine_threadsafe(self.on_press(KeyEventArgs(sequence, keycode, shift, caps))) in [None, True]
             return self.on_press(KeyEventArgs(sequence, keycode, shift, caps)) in [None, True]
         return True
