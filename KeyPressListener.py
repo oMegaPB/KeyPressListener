@@ -15,7 +15,7 @@ class KeyEventArgs: # i saw this name somewhere :thonk:
         sequence = self.key if self.key != "\n" else "\\n"
         return f'<KeyEventArgs: "Key": "{sequence}", "keycode": {self.keycode}, "shift": {self.shift}, "caps": {self.caps}>'
 # ------------------------------------------------------------------------------------------------------
-class KeyPressListener:
+class KeyPressEventListener:
     def __init__(self, on_press: Union[Callable[[KeyEventArgs], Any], Coroutine[Any, Any, Any]]) -> None:
         self.previous = {}
         self.need_to_await = False
@@ -99,6 +99,6 @@ class KeyPressListener:
 #         print(e)
 # ------------------------------------------------------------------------------------------------------
 async def main():
-    with KeyPressListener(on_press=lambda e: print(e)) as listener:
+    with KeyPressEventListener(on_press=lambda e: print(e)) as listener:
         await listener.join()
 asyncio.new_event_loop().run_until_complete(main())
