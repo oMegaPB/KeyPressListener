@@ -61,7 +61,7 @@ class KeyPressEventListener:
             return key.decode('cp1251')
         return self.none.get(keycode, None) if not win32api.GetAsyncKeyState(17) in [-32768, -32767] else None
     
-    def _dispatch(self, keycode: int) -> Optional[bool]:
+    def _dispatch(self, keycode: int) -> bool:
         caps = win32api.GetKeyState(0x14) == 1
         shift = win32api.GetAsyncKeyState(0x10) in [-32768, -32767]
         sequence = self.ToUnicodeEx(keycode)
