@@ -3,8 +3,6 @@ import re, asyncio
 from typing_extensions import Self
 from types import TracebackType
 from typing import Callable, Union, Coroutine, Any, Optional, Type
-
-BaseExceptionType = Type[BaseException]
 # ------------------------------------------------------------------------------------------------------
 class KeyEventArgs: # i saw this name somewhere :thonk:
     __slots__ = ('keycode', 'key', 'shift', 'caps')
@@ -35,7 +33,7 @@ class KeyPressListener:
     def __enter__(self) -> Self:
         return self
     
-    def __exit__(self, exc_type: Optional[BaseExceptionType], exc_value: Optional[BaseException], traceback: Optional[TracebackType]) -> bool:
+    def __exit__(self, exc_type: Optional[Type[BaseException]], exc_value: Optional[BaseException], traceback: Optional[TracebackType]) -> bool:
         return False
     
     def GetKeyboardLayoutID(self) -> int:
