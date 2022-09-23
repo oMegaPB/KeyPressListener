@@ -18,9 +18,6 @@ class KeyEventArgs: # i saw this name somewhere :thonk:
 class KeyPressEventListener:
     def __init__(self, on_press: Union[Callable[[KeyEventArgs], Any], Coroutine[Any, Any, Any]]) -> None:
         self.previous = {}
-        self.need_to_await = False
-        if asyncio.iscoroutinefunction(on_press):
-            self.need_to_await = True
         self.on_press = on_press
         self.none = {
             1: 'MouseLeft', 2: 'MouseRight', 8: 'BackSpace', 9: 'Tab', 13: 'Enter', 16: 'Shift', 
@@ -69,7 +66,7 @@ class KeyPressEventListener:
         shift = win32api.GetAsyncKeyState(0x10) in [-32768, -32767]
         sequence = self.ToUnicodeEx(keycode)
         if sequence:
-            if self.need_to_await:
+            if asyncio.iscoroutinefunction(on_press):
                 return asyncio.run_coroutine_threadsafe(self.on_press(KeyEventArgs(sequence, keycode, shift, caps))) in [None, True]
             return self.on_press(KeyEventArgs(sequence, keycode, shift, caps)) in [None, True]
         return True
@@ -90,7 +87,7 @@ class KeyPressEventListener:
                             if not self._dispatch(i):
                                 return
 # ------------------------------------------------------------------------------------------------------
-# async def on_press(e: KeyEventArgs): # example on_press function
+# async def on_press(e: KeyEventArgs): # example on_press function (can be async)
 #     if e.key == 'q':
 #         return False
 #     elif e.key == 'h':
