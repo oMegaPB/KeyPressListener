@@ -1,6 +1,5 @@
 import win32api, win32gui, win32process
 import re, asyncio
-from typing_extensions import Self
 from types import TracebackType
 from typing import Callable, Union, Coroutine, Any, Optional, Type
 # ------------------------------------------------------------------------------------------------------
@@ -15,10 +14,13 @@ class KeyEventArgs: # i saw this name somewhere :thonk:
         sequence = self.key if self.key != "\n" else "\\n"
         return f'<KeyEventArgs: "Key": "{sequence}", "keycode": {self.keycode}, "shift": {self.shift}, "caps": {self.caps}>'
 # ------------------------------------------------------------------------------------------------------
+xFunction = Union[Callable[[KeyEventArgs], Any], Coroutine[Any, Any, Any]]
+# ------------------------------------------------------------------------------------------------------
 class KeyPressEventListener:
-    def __init__(self, on_press: Union[Callable[[KeyEventArgs], Any], Coroutine[Any, Any, Any]]) -> None:
+    def __init__(self, on_press: xFunction = None, on_release: xFunction = None) -> None:
         self.previous = {}
         self.on_press = on_press
+        self.on_release = on_release
         self.none = {
             1: 'MouseLeft', 2: 'MouseRight', 8: 'BackSpace', 9: 'Tab', 13: 'Enter', 16: 'Shift', 
             19: 'Pause', 20: 'CapsLock', 27: 'Esc', 32: 'Space', 33: 'PgUp', 34: 'PgDown', 35: 'End', 
@@ -27,7 +29,7 @@ class KeyPressEventListener:
             116: 'F5', 117: 'F6', 118: 'F7', 119: 'F8', 120: 'F9', 121: 'F10', 122: 'F11', 123: 'F12', 
             144: 'NumLock', 145: 'ScLock', 164: 'Alt'
         }
-    def __enter__(self) -> Self:
+    def __enter__(self) -> "KeyPressEventListener":
         return self
     
     def __exit__(self, exc_type: Optional[Type[BaseException]], exc_value: Optional[BaseException], traceback: Optional[TracebackType]) -> bool:
@@ -42,14 +44,14 @@ class KeyPressEventListener:
             shift = win32api.GetAsyncKeyState(0x10) in [-32768, -32767]
             lid = self.GetKeyboardLayoutID()
             shift = not shift if (win32api.GetKeyState(0x14) == 1) else shift
-            if keycode == 192:
+            if keycode == 192: # dead Key
                 if lid == 1049: # ru layout
                     if not shift: return 'ё'
                     else: return 'Ё'
                 elif lid == 1033: # en layout
                     if not shift: return '`'
                     else: return '~'
-            elif keycode == 222:
+            elif keycode == 222: # another dead Key
                 if lid == 1049:
                     if not shift: return 'э'
                     else: return 'Э'
@@ -61,17 +63,18 @@ class KeyPressEventListener:
             return key.decode('cp1251')
         return self.none.get(keycode, None) if not win32api.GetAsyncKeyState(17) in [-32768, -32767] else None
     
-    def _dispatch(self, keycode: int) -> bool:
-        caps = win32api.GetKeyState(0x14) == 1
-        shift = win32api.GetAsyncKeyState(0x10) in [-32768, -32767]
-        sequence = self.ToUnicodeEx(keycode)
-        if sequence:
-            if asyncio.iscoroutinefunction(self.on_press):
-                return asyncio.run_coroutine_threadsafe(self.on_press(KeyEventArgs(sequence, keycode, shift, caps))) in [None, True]
-            return self.on_press(KeyEventArgs(sequence, keycode, shift, caps)) in [None, True]
+    def _dispatch(self, keycode: int, event: xFunction) -> bool:
+        if event:
+            caps = win32api.GetKeyState(0x14) == 1
+            shift = win32api.GetAsyncKeyState(0x10) in [-32768, -32767]
+            sequence = self.ToUnicodeEx(keycode)
+            if sequence:
+                if asyncio.iscoroutinefunction(event):
+                    return asyncio.run_coroutine_threadsafe(event(KeyEventArgs(sequence, keycode, shift, caps))) in [None, True]
+                return event(KeyEventArgs(sequence, keycode, shift, caps)) in [None, True]
         return True
 
-    def join(self) -> None: # return False in "on_press" to stop
+    def join(self) -> None: # return False in "on_press/on_release" to stop
         while True:
             win32api.Sleep(15)
             for i in range(255):
@@ -79,21 +82,24 @@ class KeyPressEventListener:
                 if state == -127 or state == -128:
                     if self.previous.get(i) is None:
                         self.previous[i] = state
-                        if not self._dispatch(i):
+                        if not self._dispatch(keycode=i, event=self.on_press):
                             return
-                    else:
-                        if self.previous[i] != state:
-                            self.previous[i] = state
-                            if not self._dispatch(i):
-                                return
+                else:
+                    if self.previous.get(i) is not None:
+                        self.previous.pop(i)
+                        if not self._dispatch(keycode=i, event=self.on_release):
+                            return
+                
 # ------------------------------------------------------------------------------------------------------
-# async def on_press(e: KeyEventArgs): # example on_press function (can be async)
+# async def myFunction(e: KeyEventArgs): # example on_press/on_release function (can be async)
 #     if e.key == 'q':
 #         return False
 #     elif e.key == 'h':
 #         print('hello from the keyboard!')
 #     else:
 #         print(e)
+# with KeyPressEventListener(on_release=myFunction) as listener:
+#     listener.join()
 # ------------------------------------------------------------------------------------------------------
-with KeyPressEventListener(on_press=lambda e: print(e)) as listener:
+with KeyPressEventListener(on_release=lambda e: print(e)) as listener:
     listener.join()
